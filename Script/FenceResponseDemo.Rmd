@@ -1,30 +1,285 @@
 ---
 title: "How ungulate respond to linear barriers"
-author: "Wenjing"
+author: "Wenjing Xu"
 date: "8/21/2019"
-output: html_document
+output:
+  pdf_document: default
+  word_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
+```
+### Overview
+#### What are different behaviors animals have when attempting to cross a linear barrier?
+ ![](/Users/Mushy/Google Drive (wenjing.xu@berkeley.edu)/RESEARCH/Pronghorn/Visuals/DemoPlots/types.png) 
+
+A general objective of this analysis is to offer a **simple** method to examine animal behaviors when encountering a fenceline (or linear barriers in general). The document is to explain the method I am using. The last section fof the document will discuss futher implications of this method.   
+
+
+The classification process. Step 1, detects all "enounter events". One encounter event is defined by all points in a continuous time period that are in a buffer zone with a certain distance. Then based on **1)** whether the animal crosses a fence-line (if so, they are not included in the analysis),**2)** duration of the encounter event and **3)** movement straghtness of the encounter event to classify types of encounter events. Straightness is the ratio of distance between the first point and last point in the trajectory of the encounter event, and the acculated distance of all steps in the trajectory. It has been shown as an effective index to estimate efficiency of an oriented movement (in comparison, tortuosity is for testing random search path). 
+
+
+#### Special situations
+1. Trapped   
+Sometimes the captured "enounter events" do not reflect animals' "response behavior". Animals can be *trapped* in a fenced area. Such situation is featured by a prolonged period that animals spent next to a fence. Sometimes the trapped situation could also be animals at non-migratory stage, such as during the wintering periord. But it is obvious that their home range area is constrained by fences. 
+
+![](/Users/Mushy/Google Drive (wenjing.xu@berkeley.edu)/RESEARCH/Pronghorn/Visuals/DemoPlots/Trapped.png) 
+
+2. TBD  
+The drawback of using "straightness" to classify *back-n-forth* and *Trace* is that there is no clear cut-off between these two behaviors (See a histogram below in the *Feedback* section showing the distribution of straightness across many animals). For such situations, I temporally marked them as *TBD* (more discussions at the end of the document).
+
+#### The parameters that can be customized in the classification  
+**FB.distance**: fence buffer distance, to identify encounter events  
+**Interval**: specify the temporal interval of the input movement data  
+**b**: maximum duration that the event would be considered as “bounce”. (if for a long time animals ”bounce” with buffer, then it is likely a “back-n-forth” response).  
+**p**: minimum duration over which we consider the animals is trapped.  
+**t**: tolerance. Sometimes, especially for high temporal resolution data, animals maybe move out of buffer but immediately back to continue the same barrier response. t needs to be smaller than b.  
+
+#### Process flowchart  
+
+ ![](/Users/Mushy/Google Drive (wenjing.xu@berkeley.edu)/RESEARCH/Pronghorn/Visuals/DemoPlots/ClassificationTree.png)    
+ 
+ Note, the straightess cut-off is rather random now.
+
+### Example: PAPO079   
+Take one individual PAPO_79 from the Pinedale population as an example.     
+
+```{r set-up,echo = FALSE, message = FALSE, warning = FALSE}
+library(rgdal)
+library(rgeos)
+library(adehabitatLT)
+library(sp)
+library(circular)
+library(dplyr)
+library(tidyr)
+library(raster)
+library(ggplot2)
+library(gridExtra)
+library(grid)
+
+fence.sp <- readOGR("/Users/Mushy/Google Drive (wenjing.xu@berkeley.edu)/RESEARCH/Pronghorn/Analysis/FenceBehavior/IndividualTrial", 'Fence062219')
+movement.sp <- readOGR("/Users/Mushy/Google Drive (wenjing.xu@berkeley.edu)/RESEARCH/Pronghorn/Analysis/FenceBehavior/IndividualTrial", 'PAPO_79')
+
+# Reproject to the same projection
+target.crs <- proj4string(movement.sp)
+fence.sp <- spTransform(fence.sp,target.crs)
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+``` {r plot, echo = FALSE}
+plot(movement.sp, col = "red")
+plot(fence.sp, col ="grey", pch = 19, add = TRUE)
+```
+  
+``` {r set up parameters}
+# ----- costamized parameter 1 --------------------------
+interval <- 3 #define time interval of the movement data
+ID <- "PAPO_79"
+# ----- costamized parameter 2 --------------------------
+# Fence buffer distance in meters 
+FB.dist <- 500
+# ----- costamized parameter 3 --------------------------
+# tolerance parameter. If "a" is point in the buffer, "b" is a buffer outside of the buffer
+# 'tolerance' is the number of b that is allowed in between of a to allow the point series be considered as a continuous encounter event
+# maybe useful for high temporal resolution data
+tolerance <- 0
+# ------ costomized parameter 4 ------------------------
+# based on the data time interval and animal ecology, maximum # of points in buffer that you'd call it a "bounce". 
+# more than this parameter, it would be back-n-forth or along or trap.
+b <- 2
+# minimum # of points in the burst that you'd call it a trap
+p <- 24
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
+``` {r extract encounter event, echo = FALSE, message = FALSE}
+# create fence buffer 
+fence.buffer <- raster::buffer(fence.sp, width=FB.dist)
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+#extract points that fall inside of the buffer 
+encounter.sp <- raster::intersect(movement.sp, fence.buffer)
+#Creat a data frame with encounter event marked as burst ID
+encounter.df <- as.data.frame(encounter.sp) 
+encounter.df <- encounter.df[which(!is.na(encounter.df$coords.x1)),]
+encounter.df$date <- as.POSIXct(strptime(as.character(encounter.df$date),"%Y-%m-%d %H:%M"))
+
+encounter.df$burst <- NA
+for (i in 2:nrow(encounter.df)){
+  if (difftime(encounter.df$date[i],encounter.df$date[i-1],units = "hours") <= (tolerance+1)*interval) {
+    encounter.df$burst[i-1] <- "m"  #mark the cell for the burst
+  }
+  else {
+    encounter.df$burst[i-1] <- "m"
+    burst.list <- encounter.df[which(encounter.df$burst == "m"),]
+    #name each burst using the starting time stamp
+    encounter.df[which(encounter.df$burst == "m"),]$burst <- format(burst.list$date[1], "%y%m%d%H") 
+  }
+}
+
+#the last set of burst would be omited in the loop. Fix the issue.
+#which(encounter.df$burst == "m") #the row numbers should be in a continuous series (including only one)
+burst.list <- encounter.df[which(encounter.df$burst == "m"),]
+encounter.df[which(encounter.df$burst == "m"),]$burst <- format(burst.list$date[1], "%y%m%d%H")
+
+# clean the data frame
+encounter.df <- encounter.df[which(!is.na(encounter.df$burst)),]  #all points that are in buffer in one dataframe
+encounter.df$ID <- ID #Add ID to the dataframe
+summary(encounter.df$burst)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+Then run classification based on the classification tree presented earlier. Here is the code I use. 
+
+``` {r classification, eval = FALSE}
+encounter.df$Type <- character(nrow(encounter.df))
+encounter.df$Straightness <- numeric(nrow(encounter.df))
+for (i in unique(encounter.df$burst)) {
+  burst.i <- encounter.df[encounter.df$burst == i, ]
+  #first for short encounter
+  if (nrow(burst.i) <= b) {  #no more than b points in the burst
+    pt.first <- burst.i[1,] #first point in the burst
+    mov.seg.i <- movement.segment.b(pt.first$ptsID) #extract movement segment between the first point pt1 and pt+ b (if they cross in bth steps, not a barrier response)
+    int.num <- length(gIntersection(mov.seg.i, fence.sp))
+    ############# Need to acknowledge possibility for mistakes here since the links between points are not the movement route. 
+    if (int.num == 0) {
+      encounter.df[which(encounter.df$burst==i),]$Type <- "Bounce"   
+    }
+    else {
+      encounter.df[which(encounter.df$burst==i),]$Type <- "None" #meaning not a barrier encounter
+    }
+  }
+  #next for longer encounter
+  else { #If the point b timesteps later out is still in the same burst/encountering event (the animal does have some extensive interactions with the barrier
+    mov.seg.i <- encounter.df[which(encounter.df$burst==i),]  # all points in the burst
+    pts <- cbind(mov.seg.i$coords.x1, mov.seg.i$coords.x2)
+    pts.sp <- SpatialPointsDataFrame(pts, mov.seg.i, proj4string = CRS(target.crs))
+    i.traj <- as.ltraj(xy =  pts, date = mov.seg.i$date, id = mov.seg.i$ID, burst = mov.seg.i$burst)
+    #moving distance from first pt to last pt in the burst
+    traj.dist <- sqrt(
+      (i.traj[[1]]$x[1]-i.traj[[1]]$x[nrow(i.traj[[1]])])*(i.traj[[1]]$x[1]-i.traj[[1]]$x[nrow(i.traj[[1]])]) +
+        (i.traj[[1]]$y[1]-i.traj[[1]]$y[nrow(i.traj[[1]])])*(i.traj[[1]]$y[1]-i.traj[[1]]$y[nrow(i.traj[[1]])]) 
+    )
+    #sum of all step lengths
+    traj.lgth <- sum(i.traj[[1]]$dist, na.rm = TRUE)
+    #straightness ranges from 0 to 1. More close to 0 more sinuous it is.
+    straightness <- traj.dist/traj.lgth
+    encounter.df[which(encounter.df$burst==i),]$Straightness <- straightness
+    if (straightness > 0.7) { #this cutoff point needs to be discussed
+      encounter.df[which(encounter.df$burst==i),]$Type <- "Along"
+    }
+    else if(straightness < 0.4) { #this cutoff point needs to be discussed
+      if (nrow(burst.i) <= p)  { #no more than p points in the burst
+        encounter.df[which(encounter.df$burst==i),]$Type <- "Back-n-forth"
+      }
+      else {
+        encounter.df[which(encounter.df$burst==i),]$Type <- "Trapped" #could also be a home ranging behavior. Can be differenciate by time
+      }
+    }
+    else {
+      encounter.df[which(encounter.df$burst==i),]$Type <- "TBD"
+    }
+  }
+}
+```
+
+Here are some examples of resulted classification of the individual PAPO_79   
+ ![](/Users/Mushy/Google Drive (wenjing.xu@berkeley.edu)/RESEARCH/Pronghorn/Visuals/DemoPlots/ResultsExamples.png) 
+
+A summary of the classification results of individual PAPO_79  
+``` {r results}
+PAPO_79 <- read.csv("/Users/Mushy/Google Drive (wenjing.xu@berkeley.edu)/RESEARCH/Pronghorn/Analysis/FenceBehavior/IndividualTrial/ClassificationResult/PAPO79_Bf500.csv")
+PAPO_79 <- PAPO_79[,2:4]
+PAPO_79$date <- as.POSIXct(strptime(as.character(PAPO_79$eventID),"%y%m%d%H"))
+PAPO_79$Month <- format(PAPO_79$date, format = "%m")
+PAPO_79$eventTYPE <- as.character(PAPO_79$eventTYPE)
+PAPO_79$eventTYPE[PAPO_79$eventTYPE == "Along"] <- "Trace"
+
+PAPO_79 <- PAPO_79[PAPO_79$eventTYPE != "None", ]
+
+PAPO_79_sum <- as.data.frame(PAPO_79 %>% group_by(eventTYPE) %>% count(Month))
+
+# month_pie <- ggplot(PAPO_79_sum, aes(x="", y= n, fill=Month)) +
+# geom_bar(width = 1, stat = "identity") +
+# coord_polar("y", start=0)
+
+month_line <- ggplot(data=PAPO_79_sum, aes(x=Month, y=n, group=eventTYPE)) +
+  geom_line(aes(color=eventTYPE))+
+  geom_point(aes(color=eventTYPE)) + 
+  ggtitle("Movement types of fence encounter event by month")
+month_line 
+
+type_pie <- ggplot(PAPO_79_sum, aes(x="", y= n, fill= eventTYPE)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start=0) +
+  ggtitle("Year around proportions of each movement types")
+type_pie
+
+# bar_plot <- ggplot(PAPO_79_sum, aes(x=eventTYPE, y = n, fill = Month)) +
+#   geom_bar( stat ="identity") + 
+#   ggtitle("Fence response by movement type by month")
+
+# grid.arrange(bar_plot, type_pie, ncol = 2, nrow = 1)
+
+
+```
+ 
+The result is pretty preliminary but there are a couple things that I notice:   
+1. There are in total `r sum(PAPO_79_sum$n)` encounter events for animal POAPO79. We were able to classify `r sum(PAPO_79_sum[PAPO_79_sum$eventTYPE != "TBD", ]$n)` of them.  
+2. Most of the events are classified as bounce, then back-n-force and trace. Most envountering events are in the winter (Nov - Apr).  
+3. Most of the fence response behavior , especially *Bounce* happens more in winter/spring while *trap* is all in the summer/early fall.   
+
+I applied the method to all animals with 3 hour interval in pinedale and the data is vidualized at [this link that I shared before](https://kepler.gl/demo/map?mapUrl=https://dl.dropboxusercontent.com/s/hyeqvvhzjwf6pym/keplergl_ro2snma.json).   
+
+The following are the same two summary plot for all individuals:
+
+``` {r all results}
+PAPO_3h_all <- read.csv("/Users/Mushy/Google Drive (wenjing.xu@berkeley.edu)/RESEARCH/Pronghorn/Analysis/FenceBehavior/Result/pinedale_int3_Types_Bf500_allwitLatlong.csv")
+PAPO_3h_all$time <- as.POSIXct(strptime(PAPO_3h_all$time, format = "%m/%d/%Y %H:%M" ))
+PAPO_3h_all$Month <- format(PAPO_3h_all$time, format = "%m")
+PAPO_3h_all$eventTYPE <- as.character(PAPO_3h_all$eventTYPE)
+PAPO_3h_all$eventTYPE[PAPO_3h_all$eventTYPE == "Along"] <- "Trace"
+
+PAPO_3h_all <- PAPO_3h_all[PAPO_3h_all$eventTYPE != "None", ]
+
+PAPO_3h_all_sum <- as.data.frame(PAPO_3h_all %>% group_by(eventTYPE) %>% count(Month))
+
+month_line <- ggplot(data=PAPO_3h_all_sum, aes(x=Month, y=n, group=eventTYPE)) +
+  geom_line(aes(color=eventTYPE))+
+  geom_point(aes(color=eventTYPE)) + 
+  ggtitle("Movement types of fence encounter event by month")
+month_line 
+
+type_pie <- ggplot(PAPO_3h_all_sum, aes(x="", y= n, fill= eventTYPE)) +
+  geom_bar(width = 1, stat = "identity") +
+  coord_polar("y", start=0) +
+  ggtitle("Year around proportions of each movement types")
+type_pie
+
+```
+
+
+1. There are in total `r sum(PAPO_3h_all_sum$n)` encounter events for 62 animal-year. We were able to classify `r sum(PAPO_3h_all_sum[PAPO_3h_all_sum$eventTYPE != "TBD", ]$n)` of them.  
+2. Same as the individual result, most of the events are classified as bounce, then back-n-force and trace.But now summer shows the most encountering event, following by late spring.  
+3. Both *Bounce* and *Back-n-forth* show 2 peaks one in spring on in summer, while *Trace* and *Trap* is relative stable.  
+
+### Feedback needed
+1. What to do with the intermediate classes *TBD*? Visual interpretation shows they are indeed something in the middle of "*trace*" and "*back-n-forth*". The following histogram shows the straightness calculation for Back-n-forn, TBD, and Trace. There is no clear cut-offs really.   
+
+``` {r histogram}
+PAPO_3h_sub <- PAPO_3h_all %>% filter(eventTYPE %in% c("Back-n-forth","Trace","TBD"))
+ggplot(PAPO_3h_sub, aes(x=straightness)) + geom_histogram(bins = 50)
+```
+  
+A potential solution is to treat "trace" and "back-n-forth" as a continuous behavior. So we only keep *bounce* and *trace*, with *trace* characterized with a straightness index. Any thoughts?   
+
+2. Ecological interpretations of "bouncing", "tracing" and "back-n-force"? This question is related to my next question -   
+3. How to quantify the level of *problematic* of fences? Or really, we are trying to find the fence that is worthwhile to modify.  
+    + accumulative time animals spent near it?    
+    + (maybe a better tone) fence lines where animal more often conduct *back-n-force* behavior. *Trace* may mean the fence is paralell to the general direction the animal wants to go but *back-n-forth* may mean they are seeking for an exist.
+
+4. We do not know whether this method is sensitive to different fix intervals or not. I would assume a higher temporal frequency will yield better classification results. I might conduct a sensitivity analysis using high frequency animal data resampled down to multiple different invervals. 
+
+#### Implications of the method
+The next step is then to use the classification results to **1)** identify the most problematic fences, **2)** idenfity time of year when animals are the most vulnerable to fences, **3)** examine external factors which may affect how animals respond to fences (e.g. landscape features, time of year, human activities...), **4)** examine intra- and inter-species differences in animals behaviral responses to fences. But for this document, it is main to discuss the method itself.    
+
+**1)**, **2)**, and maybe **3)** can reveal more practical answers for the managers in WY and maybe can be included in one paper. I am very interested in **4)** and I might be able to test this on Mongolian gazelle and wildebeast (both of them are proven to be heavily restricted by fences). As a comparison, we could apply to one species that is not as susceptible to fences, such as mule deer?     
