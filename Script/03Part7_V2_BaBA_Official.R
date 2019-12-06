@@ -108,7 +108,7 @@ fence.buffer <- raster::buffer(fence.sp, width=FB.dist)
 
 #read in movement data
 #ideally, the movement data should not have missing point. This trial file does have missing points.
-movement.df.all <- read.csv("Int2_Comp_Raw_All.csv") 
+movement.df.all <- read.csv("Int2_MULE_Raw_All.csv") 
 movement.df.all$date <- as.POSIXct(strptime(as.character(movement.df.all$date),"%m/%d/%Y %H:%M")) #change the format based on the data
 movement.df.all <- movement.df.all <- movement.df.all[(!is.na(movement.df.all$date))&(!is.na(movement.df.all$Easting)),]
 
@@ -123,7 +123,7 @@ xy <- cbind(movement.df.all$Easting, movement.df.all$Northing)
 movement.sp.all <- SpatialPointsDataFrame (coords = xy, data = movement.df.all, proj4string = CRS(target.crs))
 
 # read in straightness table 
-animal.stn.df <- read.csv(paste0(getwd(), "I2_all_Straightness.csv"))
+animal.stn.df <- read.csv(paste0(getwd(), "I2_MULE_Straightness.csv"))
 ################################################################################
 # classification step 1: generate encountering event dataframe --------
 
@@ -183,7 +183,7 @@ encounter.df = foreach (i = unique(movement.df.all$Location.ID),
   encounter.df <- encounter.df[which(!is.na(encounter.df$burst)),]  #all points that are in buffer in one dataframe
   encounter.df
 }
-#write.csv(encounter.df, file = ("I2_All_FB109_B4_P36_EncounterEvents.csv"))
+write.csv(encounter.df, file = ("I2_MULE_FB109_B4_P36_EncounterEvents.csv"))
 
 close(pb)
 #stop cluster
@@ -284,7 +284,7 @@ event.df = foreach (
 }
 #event.df.temp <- event.df
 #event.df <- event.df.temp
-write.csv(event.df, file = "I2_All_FB109_B4_P36_Step1Cls.csv")
+write.csv(event.df, file = "I2_MULE_FB109_B4_P36_Step1Cls.csv")
 
 close(pb)
 #stop cluster
@@ -335,5 +335,5 @@ for (i in 1:nrow(event.df)) {
   }
 }
 event.df.1 <- event.df
-write.csv(event.df.1,"I2_All_FB109_B4_P36_FinalCls.csv")
+write.csv(event.df.1,"I2_MULE_FB109_B4_P36_FinalCls.csv")
 

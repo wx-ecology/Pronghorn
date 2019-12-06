@@ -73,7 +73,7 @@ strtns <- function(mov.seg) {
 #############################
 #read in movement data
 #ideally, the movement data should not have missing point. This trial file does have missing points.
-movement.df.all <- read.csv("Int2_Comp_Raw_All.csv") 
+movement.df.all <- read.csv("Int2_MULE_Raw_All.csv") 
 movement.df.all$date <- as.POSIXct(strptime(as.character(movement.df.all$date),"%m/%d/%Y %H:%M")) #change the format based on the data
 movement.df.all <- movement.df.all[(!is.na(movement.df.all$date))&(!is.na(movement.df.all$Easting)),]
 
@@ -101,4 +101,4 @@ for (i in unique(movement.df.all$Location.ID)) {
     animal.stn.df <- rbind(animal.stn.df, rows.i)
   }
 }
-write.csv(animal.stn.df, paste0(getwd(), "I2_all_Straightness.csv"))
+write.csv(animal.stn.df, paste0(getwd(), "I2_MULE_Straightness.csv"))
