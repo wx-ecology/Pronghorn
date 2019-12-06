@@ -119,7 +119,7 @@ plot.distden <- ggplot(distance.df, aes(x = dist2fence)) +
   xlim(0, 6000) +
   geom_vline(xintercept = qu1, color = '#ea4d2e', size = 1) +
   geom_vline(aes(xintercept= qu2, color="ea4d2e"),linetype="dashed", size = 1) +
-  labs (title = "Distribution of distances from pronghorn locations during migration to fences (smoothed)", x = "Density", y = "Distance to Fences (m)") +
+  labs (title = "Distribution of distances from pronghorn locations during migration to fences (smoothed)", x = "Distance to Fences (m)" , y = "Density") +
   theme_bw() + 
   theme(legend.position = "none") 
 plot.distden
