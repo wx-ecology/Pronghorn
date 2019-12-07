@@ -9,6 +9,10 @@
 #############################
 ######### Set-up ###########
 #############################
+#############################
+setwd("C:\\Users\\wenjing.xu\\Google Drive\\RESEARCH\\Pronghorn\\Analysis\\FenceBehavior_Official")
+
+
 event.df <- read.csv("I2_MULE_FB109_B4_P36_FinalCls.csv")
 encounter.df <- read.csv("I2_MULE_FB109_B4_P36_EncounterEvents.csv")
 encounter.df$date <- as.POSIXct(strptime(as.character(encounter.df$date),"%Y-%m-%d %H:%M"))
@@ -16,7 +20,15 @@ movement.df.all <- movement.df.all <- read.csv("Int2_MULE_Raw_All.csv")
 movement.df.all$date <- as.POSIXct(strptime(as.character(movement.df.all$date),"%m/%d/%Y %H:%M")) #change the format based on the data
 movement.df.all <- movement.df.all <- movement.df.all[(!is.na(movement.df.all$date))&(!is.na(movement.df.all$Easting)),]
 
-#event.df$burstID <- as.POSIXct(strftime(event.df$burstID, "%Y-%m-%d %H:%M"))
+
+# prepare spatial dataframe -----------------------------------
+#read in fence data
+fence.filename <- 'Fence_convex_FINAL'
+fence.sp <- readOGR(".", fence.filename)
+#fence.sp <- spTransform(fence.sp,target.crs)
+fence.buffer <- raster::buffer(fence.sp, width=FB.dist)
+
+
 
 # ---- random samples for visualizations
 # --- method 1: randomly select encounter events to visually classify ------
@@ -24,6 +36,10 @@ n <- nrow(event.df)
 m <- round (n*0.1)
 set.seed(7)
 samples <- sort(sample(1:n, m))
+
+# export sample table 
+# sampletable <- event.df %>% filter(X %in% samples)
+# write.csv(sampletable, "Mule_Validation.csv")
 
 for (i in samples) {  # i is event ID. 
   event.i <- event.df[i,]
@@ -44,7 +60,9 @@ for (i in samples) {  # i is event ID.
   
   plot(i.traj, xlim=c(min(pts[,1]-500), max(pts[,1]+500)), ylim=c(min(pts[,2]-500), max(pts[,2]+500)))
   #plot(fence.buffer, col = rgb(0.36,0.57,0.28), xlim=c(min(pts.large[,1]-200), max(pts.large[,1]+200)), ylim=c(min(pts.large[,2]-200), max(pts.large[,2]+200)), add = T)
+  plot(fence.buffer, add = T)
   plot(fence.sp, lwd=2, add = T)
+  
   readline(prompt= paste0("No.", which(samples ==i), " sample, event ID is ", i, 
                           ", sample type is ", Type, ", ", m-(which(samples ==i)), " to go." ))
 }
@@ -67,7 +85,9 @@ ploti <- function (i) {
   
   plot(i.traj, xlim=c(min(pts[,1]-500), max(pts[,1]+500)), ylim=c(min(pts[,2]-500), max(pts[,2]+500)))
   #plot(fence.buffer, col = rgb(0.36,0.57,0.28), xlim=c(min(pts.large[,1]-200), max(pts.large[,1]+200)), ylim=c(min(pts.large[,2]-200), max(pts.large[,2]+200)), add = T)
+  plot(fence.buffer, add = T)
   plot(fence.sp, lwd=2, add = T)
+  plot(i.traj, add = T)
 }
 
 ploti(218)

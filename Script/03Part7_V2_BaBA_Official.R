@@ -68,7 +68,7 @@ half.window <- ave.window/2
 #############################
 # extract movement segment between the time of m and predetermined time lap b*interval.  
 movement.segment.b <- function(m) {
-  n <- m + b # if there are missing datapoint, this n point might be over the b*interval that it should be.
+  n <- m + b + 1 # if there are missing datapoint, this n point might be over the b*interval that it should be.
   segments <- movement.df[which(movement.df$ptsID >= m & movement.df$ptsID <=n),]
   seg.line <- Lines(Line(cbind(segments$coords.x1, segments$coords.x2)), ID = segments$date[1])
   segments.sp <- SpatialLines(list(seg.line), proj4string = CRS(target.crs))
