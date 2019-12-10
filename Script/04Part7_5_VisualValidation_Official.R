@@ -19,7 +19,6 @@ movement.df.all <- movement.df.all <- read.csv("Int2_MULE_Raw_All.csv")
 movement.df.all$date <- as.POSIXct(strptime(as.character(movement.df.all$date),"%m/%d/%Y %H:%M")) #change the format based on the data
 movement.df.all <- movement.df.all <- movement.df.all[(!is.na(movement.df.all$date))&(!is.na(movement.df.all$Easting)),]
 
-
 # prepare spatial dataframe -----------------------------------
 #read in fence data
 fence.filename <- 'Fence_convex_FINAL'
