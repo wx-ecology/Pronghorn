@@ -12,7 +12,6 @@
 #############################
 setwd("C:\\Users\\wenjing.xu\\Google Drive\\RESEARCH\\Pronghorn\\Analysis\\FenceBehavior_Official")
 
-
 event.df <- read.csv("I2_MULE_FB109_B4_P36_FinalCls.csv")
 encounter.df <- read.csv("I2_MULE_FB109_B4_P36_EncounterEvents.csv")
 encounter.df$date <- as.POSIXct(strptime(as.character(encounter.df$date),"%Y-%m-%d %H:%M"))
