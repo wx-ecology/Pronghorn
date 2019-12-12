@@ -39,7 +39,7 @@ interval <- 2 #define time interval (in hours) of the movement data
 ## Fence buffer distance in meters 
 # advised fence buffer distance is the 1st qu. of all points distance to fences
 # there is a seperate script that can calculate distance from all points to fences (Dist2FecneAnalysis_Official)
-FB.dist <- 150
+FB.dist <- 100
 
 ## tolerance parameter. If "a" is point in the buffer, "b" is a buffer outside of the buffer
 # x is the number of b that is allowed in between of a to allow the point series be considered as a continuous encounter event
@@ -61,15 +61,16 @@ p <- p.hours/interval
 ave.window <- 7
 half.window <- ave.window/2
 
+# maximum crosses allowed for tracing behavior 
+max.cross <- 4 
 # 
 
 #############################
 #########Functions###########
 #############################
 # extract movement segment between the time of m and predetermined time lap b*interval.  
-movement.segment.b <- function(m) {
-  n <- m + b # if there are missing datapoint, this n point might be over the b*interval that it should be.
-  segments <- movement.df[which(movement.df$ptsID >= m & movement.df$ptsID <=n),]
+movement.segment.b <- function(pt1, pt2) {
+  segments <- movement.df[which(movement.df$ptsID >= pt1-1 & movement.df$ptsID <= pt2 + 1),]
   seg.line <- Lines(Line(cbind(segments$coords.x1, segments$coords.x2)), ID = segments$date[1])
   segments.sp <- SpatialLines(list(seg.line), proj4string = CRS(target.crs))
   return(segments.sp)
@@ -123,7 +124,7 @@ xy <- cbind(movement.df.all$Easting, movement.df.all$Northing)
 movement.sp.all <- SpatialPointsDataFrame (coords = xy, data = movement.df.all, proj4string = CRS(target.crs))
 
 # read in straightness table 
-animal.stn.df <- read.csv(paste0(getwd(), "I2_all_Straightness.csv"))
+animal.stn.df <- read.csv("I2_PRON_Straightness.csv")
 ################################################################################
 # classification step 1: generate encountering event dataframe --------
 
@@ -183,7 +184,7 @@ encounter.df = foreach (i = unique(movement.df.all$Location.ID),
   encounter.df <- encounter.df[which(!is.na(encounter.df$burst)),]  #all points that are in buffer in one dataframe
   encounter.df
 }
-write.csv(encounter.df, file = ("I2_All_FB150_B4_P36_EncounterEvents.csv"))
+write.csv(encounter.df, paste0("I2_PRON_FB", FB.dist, "_B4_P36_EncounterEvents.csv"))
 
 close(pb)
 #stop cluster
@@ -241,7 +242,8 @@ event.df = foreach (
     #first for short encounter
     if (difftime (end.time, start.time, units = "hours") <= b * interval) {  #no more than b*interval H, only spend small amount of time in this burst
       pt.first <- burst.i[1, ] #first point in the burst
-      mov.seg.i <- movement.segment.b(pt.first$ptsID) #extract movement segment between the first point pt1 and pt+ b (if they cross in bth steps, not a barrier response)
+      pt.last <- burst.i[nrow(burst.i), ]
+      mov.seg.i <- movement.segment.b(pt.first$ptsID, pt.last$ptsID) #extract movement segment with one point before and one point after the segmentation
       #here is another measurement that prefer smaller time interval movement data. Big interval data between point distance can misrepresent real trajectory
       if (nrow(coordinates(mov.seg.i)[[1]][[1]]) <= b) {
         #which means this event is at the end of the individual's traj. Not enough points to tell catagories.
@@ -284,7 +286,7 @@ event.df = foreach (
 }
 #event.df.temp <- event.df
 #event.df <- event.df.temp
-write.csv(event.df, file = "I2_All_FB150_B4_P36_Step1Cls.csv")
+write.csv(event.df, paste0("I2_PRON_FB", FB.dist, "_B4_P36_Step1Cls.csv"))
 
 close(pb)
 #stop cluster
@@ -327,13 +329,18 @@ for (i in 1:nrow(event.df)) {
       if (event.df[i,]$straightness < lower) {
         event.df[i,]$eventTYPE <- "Back-n-forth"
       } else if (event.df[i,]$straightness > upper) {
-          event.df[i,]$eventTYPE <- "Trace"
-        } else {
-          event.df[i,]$eventTYPE <- "Average Movement"
-        }
+          if (event.df[i,]$duration  < max.cross) {
+            event.df[i,]$eventTYPE <- "Trace"
+          }
+          else {
+            event.df[i,]$eventTYPE <- "unknown"
+          }
+      } else {
+        event.df[i,]$eventTYPE <- "Average Movement"
+      }
     }
   }
 }
 event.df.1 <- event.df
-write.csv(event.df.1,"I2_All_FB150_B4_P36_FinalCls.csv")
+write.csv(event.df.1, paste0("I2_PRON_FB", FB.dist, "_B4_P36_FinalCls.csv"))
 
