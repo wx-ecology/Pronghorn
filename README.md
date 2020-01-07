@@ -1,6 +1,8 @@
 # Pronghorn Analysis folder
 created: 2019  
 
+note: nothing super organized. Not for publications but just for playing around.
+
 **Script** 
 1. (1-3) *preprocess*, clean data, add NA lines (where time inserted but location remains NA), create SHP files
 2. (4-6) *NSD* calculation and *migration cycle visualization*. Output used for summarizing data conditions in the *visual* folder
