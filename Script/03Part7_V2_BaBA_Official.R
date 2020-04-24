@@ -39,7 +39,7 @@ interval <- 2 #define time interval (in hours) of the movement data
 ## Fence buffer distance in meters 
 # advised fence buffer distance is the 1st qu. of all points distance to fences
 # there is a seperate script that can calculate distance from all points to fences (Dist2FecneAnalysis_Official)
-FB.dist <- 100
+FB.dist <- 50
 
 ## tolerance parameter. If "a" is point in the buffer, "b" is a buffer outside of the buffer
 # x is the number of b that is allowed in between of a to allow the point series be considered as a continuous encounter event
@@ -102,15 +102,15 @@ min.nonneg <- function(x) min(x[x >= 0])
 setwd("C:\\Users\\wenjing.xu\\Google Drive\\RESEARCH\\Pronghorn\\Analysis\\FenceBehavior_Official")
 # prepare spatial dataframe -----------------------------------
 #read in fence data
-fence.filename <- 'Fence_convex_FINAL'
+fence.filename <- 'Fence_AOI_FINAL_Dec2019'
 fence.sp <- readOGR(".", fence.filename)
 #fence.sp <- spTransform(fence.sp,target.crs)
 fence.buffer <- raster::buffer(fence.sp, width=FB.dist)
 
 #read in movement data
 #ideally, the movement data should not have missing point. This trial file does have missing points.
-movement.df.all <- read.csv("Int2_PRON_Raw_Final.csv") 
-movement.df.all$date <- as.POSIXct(strptime(as.character(movement.df.all$date),"%m/%d/%Y %H:%M")) #change the format based on the data
+movement.df.all <- read.csv("Int2_MULE_Raw_Final.csv") 
+movement.df.all$date <- as.POSIXct(strptime(as.character(movement.df.all$date),"%Y-%m-%d %H:%M")) #change the format based on the data
 movement.df.all <- movement.df.all <- movement.df.all[(!is.na(movement.df.all$date))&(!is.na(movement.df.all$Easting)),]
 
 # add point ID by individual
@@ -124,7 +124,7 @@ xy <- cbind(movement.df.all$Easting, movement.df.all$Northing)
 movement.sp.all <- SpatialPointsDataFrame (coords = xy, data = movement.df.all, proj4string = CRS(target.crs))
 
 # read in straightness table 
-animal.stn.df <- read.csv("I2_PRON_Straightness.csv")
+animal.stn.df <- read.csv("I2_MULE_Straightness.csv")
 ################################################################################
 # classification step 1: generate encountering event dataframe --------
 
@@ -329,7 +329,7 @@ for (i in 1:nrow(event.df)) {
       if (event.df[i,]$straightness < lower) {
         event.df[i,]$eventTYPE <- "Back-n-forth"
       } else if (event.df[i,]$straightness > upper) {
-          if (event.df[i,]$duration  < max.cross) {
+          if (event.df[i,]$cross  < max.cross) {
             event.df[i,]$eventTYPE <- "Trace"
           }
           else {

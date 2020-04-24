@@ -6,9 +6,20 @@
 # final classification table 
 # encounter event table 
 
+
 #############################
 ######### Set-up ###########
 #############################
+
+# ----- libraries -------
+library(dplyr)
+# spatial analysis
+library(rgdal)
+library(rgeos)
+library(sp)
+library(raster)
+#trajectory analysis
+library(adehabitatLT)
 
 setwd("C:\\Users\\wenjing.xu\\Google Drive\\RESEARCH\\Pronghorn\\Analysis\\FenceBehavior_Official")
 
@@ -17,7 +28,7 @@ movement.df.all$date <- as.POSIXct(strptime(as.character(movement.df.all$date),"
 movement.df.all <- movement.df.all <- movement.df.all[(!is.na(movement.df.all$date))&(!is.na(movement.df.all$Easting)),]
 
 
-FB.dist <- 100
+FB.dist <- 90
 event.df <- read.csv(paste0("I2_PRON_FB", FB.dist, "_B4_P36_FinalCls.csv"))
 event.df$burstID <- as.character(event.df$burstID)
 encounter.df <- read.csv(paste0("I2_PRON_FB", FB.dist, "_B4_P36_EncounterEvents.csv"))
@@ -38,6 +49,7 @@ fence.buffer <- raster::buffer(fence.sp, width=FB.dist)
 
 # ---- random samples for visualizations
 # --- method 1: randomly select encounter events to visually classify ------
+event.df %>% filter(eventTYPE == "unknown")
 n <- nrow(event.df)
 m <- round (n*0.5)
 set.seed(7)
